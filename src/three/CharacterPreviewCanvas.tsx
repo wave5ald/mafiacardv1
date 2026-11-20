@@ -9,19 +9,31 @@ import {
   startPacedLoop,
 } from './utils';
 
+export type PreviewZoom = 'full' | 'face';
+
 interface CharacterPreviewCanvasProps {
   appearance: CharacterAppearance;
   rotationStepSignal: { dir: -1 | 1; seq: number };
+  zoom?: PreviewZoom;
 }
+
+// Camera framing targets: whole body turntable vs. tight head / hair close-up
+const FULL_BODY_POS = new THREE.Vector3(0, 1.56, 5.18);
+const FULL_BODY_LOOK = new THREE.Vector3(0, 0.94, 0);
+const FACE_POS = new THREE.Vector3(0, 1.62, 2.02);
+const FACE_LOOK = new THREE.Vector3(0, 1.54, 0);
 
 export function CharacterPreviewCanvas({
   appearance,
   rotationStepSignal,
+  zoom = 'full',
 }: CharacterPreviewCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<THREE.Group | null>(null);
   const charRigRef = useRef<ChibiCharacterRig | null>(null);
   const targetRotYRef = useRef<number>(0);
+  const zoomRef = useRef<PreviewZoom>(zoom);
+  zoomRef.current = zoom;
 
   useEffect(() => {
     if (rotationStepSignal.seq > 0) {
@@ -43,8 +55,9 @@ export function CharacterPreviewCanvas({
       0.1,
       50,
     );
-    camera.position.set(0, 1.56, 5.18);
-    camera.lookAt(0, 0.94, 0);
+    camera.position.copy(FULL_BODY_POS);
+    camera.lookAt(FULL_BODY_LOOK);
+    const lookPoint = FULL_BODY_LOOK.clone();
 
     // Bright stylized 3-point lighting matching the cartoon mockup
     const hemi = new THREE.HemisphereLight('#F3E8FF', '#2E1E59', 1.25);
@@ -124,6 +137,17 @@ export function CharacterPreviewCanvas({
     syncSize();
 
     const stopLoop = startPacedLoop(renderer, isSoftwareGl, (dt, elapsed) => {
+      // Smoothly lerp the camera between the full-body and face/hair framings
+      const targetPos = zoomRef.current === 'face' ? FACE_POS : FULL_BODY_POS;
+      const targetLook = zoomRef.current === 'face' ? FACE_LOOK : FULL_BODY_LOOK;
+      camera.position.x = THREE.MathUtils.damp(camera.position.x, targetPos.x, 5.5, dt);
+      camera.position.y = THREE.MathUtils.damp(camera.position.y, targetPos.y, 5.5, dt);
+      camera.position.z = THREE.MathUtils.damp(camera.position.z, targetPos.z, 5.5, dt);
+      lookPoint.x = THREE.MathUtils.damp(lookPoint.x, targetLook.x, 5.5, dt);
+      lookPoint.y = THREE.MathUtils.damp(lookPoint.y, targetLook.y, 5.5, dt);
+      lookPoint.z = THREE.MathUtils.damp(lookPoint.z, targetLook.z, 5.5, dt);
+      camera.lookAt(lookPoint);
+
       currentRotY = THREE.MathUtils.damp(currentRotY, targetRotYRef.current, 10, dt);
       stage.rotation.y = currentRotY;
       if (charRigRef.current) {

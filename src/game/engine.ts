@@ -412,7 +412,7 @@ export class GameRoomEngine {
         appearance.hatId === 'none'
           ? 'none'
           : Math.max(0, Math.min(9, Math.floor(Number(appearance.hatId) || 0))),
-      hairId: Math.max(0, Math.min(9, Math.floor(Number(appearance.hairId) || 0))),
+      hairId: Math.max(0, Math.min(10, Math.floor(Number(appearance.hairId) || 0))),
       skinColor: appearance.skinColor,
       hairColor: appearance.hairColor,
     };

@@ -4,6 +4,7 @@ import {
   BookOpen,
   Check,
   Clock,
+  Crosshair,
   Eye,
   LogOut,
   RotateCcw,
@@ -75,6 +76,7 @@ export function GameHud({
   const aliveCount = room.players.filter((p) => p.alive).length;
 
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [recenterSignal, setRecenterSignal] = useState(0);
   const [abilityTargetingMode, setAbilityTargetingMode] = useState(false);
   const [abilityTarget1, setAbilityTarget1] = useState<string | null>(null);
   const [feedbackError, setFeedbackError] = useState<ValidationErrorPayload['code'] | null>(null);
@@ -445,6 +447,7 @@ export function GameHud({
         isMeSleeping={isMeSleeping}
         canPickPlayer={isMyActiveTurn && !isMeSleeping}
         selectedPlayerIds={selectedPlayerIds}
+        recenterSignal={recenterSignal}
         onSelectPlayer={(id) => {
           void handlePlayerPick(id);
         }}
@@ -517,6 +520,18 @@ export function GameHud({
                 type="button"
                 onClick={() => {
                   audioSynth.click();
+                  setRecenterSignal((s) => s + 1);
+                }}
+                aria-label={t.resetView}
+                title={t.resetView}
+                className="w-10 h-10 rounded-xl bg-[#1A1340]/95 hover:bg-[#2A205C] border border-purple-300/30 text-[#7FD3FF] flex items-center justify-center"
+              >
+                <Crosshair className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  audioSynth.click();
                   onOpenRules();
                 }}
                 aria-label={t.rulesAndCards}
@@ -573,8 +588,20 @@ export function GameHud({
             )}
           </div>
 
-          {/* Desktop-only End: Rules, Audio, Leave */}
+          {/* Desktop-only End: Recenter, Rules, Audio, Leave */}
           <div className="pointer-events-auto hidden sm:flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                audioSynth.click();
+                setRecenterSignal((s) => s + 1);
+              }}
+              aria-label={t.resetView}
+              title={t.resetView}
+              className="w-11 h-11 rounded-2xl bg-[#1A1340]/95 hover:bg-[#2A205C] border border-purple-300/30 text-[#7FD3FF] flex items-center justify-center"
+            >
+              <Crosshair className="w-5 h-5" />
+            </button>
             <button
               type="button"
               onClick={() => {

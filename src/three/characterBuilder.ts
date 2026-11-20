@@ -331,6 +331,14 @@ function populateHairGroup(
 
   const catalog = HAIR_CATALOG[gender];
   const style = catalog[hairId % catalog.length];
+
+  // BALD: build absolutely zero hair meshes so the clean skin head + ears show
+  // through with no scalp shells, leftover patches or z-fighting. Eyebrows stay
+  // tinted by `hairColor` because they are painted by the face texture.
+  if (style.variant === 'bald') {
+    return;
+  }
+
   const hairMat = makeSatinMat(hairColor, 0.46, 0.06);
   hairMat.side = THREE.DoubleSide;
 
@@ -432,12 +440,13 @@ function populateHairGroup(
       [0.26, -dir * 0.18, -dir * 1.54],
       [0.84 * s, 0.34 * s, 0.66],
     );
-    // Opposite counter-part lock creating clean V-part notch like the mockup
+    // Opposite counter-part lock: short, close to the brow so the fringe keeps
+    // a clean V-part notch without any spike above the crown silhouette.
     addTuft(
       curvedTuftGeo,
-      [-dir * 0.17, by + 0.005, bz - 0.04],
-      [0.22, dir * 0.42, dir * 1.48],
-      [0.82 * s, 0.3 * s, 0.65],
+      [-dir * 0.185, by - 0.03, bz - 0.035],
+      [0.2, dir * 0.42, dir * 1.48],
+      [0.62 * s, 0.17 * s, 0.56],
     );
     // Smooth temple-bridging fringe wisps tucked cleanly along sides
     addTuft(
@@ -692,230 +701,404 @@ function populateHairGroup(
       }
     }
   } else {
-    // FEMALE 10 HAIRSTYLES — expressive sculpted cartoon bangs, delicate cheek strands, distinct silhouettes!
+    // ============================================================
+    // FEMALE HAIRSTYLES — soft, sculpted, 360° clean silhouettes.
+    // Every style shares the form-fitting scalp cap above, then layers
+    // smooth tapered locks so front / 3-4 / side / back all read cleanly.
+    // `hatMode` compresses only the top crown and keeps bangs + length.
+    // ============================================================
     const isPixie = style.variant === 'pixie';
-    addCartoonSweptBangs(1, !isPixie);
+    const crownLift = hatMode ? 0.055 : 0;
 
-    // Delicate face-framing cheek locks (curved gently inward)
-    if (!isPixie) {
+    // Reusable soft curl blob (low-poly sphere, shared material)
+    const addCurl = (
+      pos: [number, number, number],
+      radius: number,
+      scale: [number, number, number] = [1, 1, 1],
+      rot: [number, number, number] = [0, 0, 0],
+    ) => {
+      const curl = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 9), hairMat);
+      curl.position.set(pos[0], pos[1], pos[2]);
+      curl.scale.set(scale[0], scale[1], scale[2]);
+      curl.rotation.set(rot[0], rot[1], rot[2]);
+      hairGroup.add(curl);
+      return curl;
+    };
+
+    // Smooth rear shell that hugs the skull (never a floating bowl)
+    const addBackShell = (
+      topTheta: number,
+      thetaLength: number,
+      y: number,
+      z: number,
+      scale: [number, number, number],
+    ) => {
+      const shell = new THREE.Mesh(
+        new THREE.SphereGeometry(
+          0.428,
+          20,
+          14,
+          // Exclude a wide wedge around the face (+Z) so cheeks/eyes stay clear
+          Math.PI * 0.78,
+          Math.PI * 1.44,
+          topTheta,
+          thetaLength,
+        ),
+        hairMat,
+      );
+      shell.position.set(0, y, z);
+      shell.scale.set(scale[0], scale[1], scale[2]);
+      hairGroup.add(shell);
+      return shell;
+    };
+
+    // Matching hair tie / scrunchie
+    const addTie = (color: string, pos: [number, number, number], rotX = 0.2) => {
+      const tieMat = makeSatinMat(color, 0.34, 0.22);
+      const tie = new THREE.Mesh(new THREE.TorusGeometry(0.088, 0.028, 8, 14), tieMat);
+      tie.position.set(pos[0], pos[1], pos[2]);
+      tie.rotation.x = rotX;
+      hairGroup.add(tie);
+      return tie;
+    };
+
+    // Sculpted satin bow (knot + two loops + two tails)
+    const addBow = (pos: [number, number, number], size = 1, color = '#FF3B5C') => {
+      const bowMat = makeSatinMat(color, 0.32, 0.18);
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.05 * size, 10, 8), bowMat);
+      knot.position.set(pos[0], pos[1], pos[2]);
+      hairGroup.add(knot);
+      for (const side of [-1, 1]) {
+        const loop = new THREE.Mesh(new THREE.SphereGeometry(0.086 * size, 12, 9), bowMat);
+        loop.scale.set(1.3, 0.72, 0.5);
+        loop.position.set(pos[0] + side * 0.1 * size, pos[1] + 0.012, pos[2] - 0.008);
+        loop.rotation.z = side * 0.24;
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.042 * size, 0.14 * size, 0.02), bowMat);
+        tail.position.set(pos[0] + side * 0.05 * size, pos[1] - 0.085 * size, pos[2] - 0.012);
+        tail.rotation.z = -side * 0.22;
+        hairGroup.add(loop, tail);
+      }
+    };
+
+    // Soft side-swept curtain lock framing the cheek (shared by most styles)
+    const addFaceFraming = (depth = 0.1, length = 0.46, outward = 0.36) => {
       for (const side of [-1, 1]) {
         addTuft(
           curvedTuftGeo,
-          [side * 0.405, 0.02, 0.135],
-          [0.08, -side * 0.22, Math.PI + side * 0.08],
-          [0.7, 0.42, 0.68],
+          [side * outward, -0.03, depth],
+          [0.06, -side * 0.16, Math.PI + side * 0.12],
+          [0.82, length, 0.72],
         );
       }
-    }
+    };
 
     switch (style.variant) {
+      // 1. LONG FLOWING WAVES — side curtain bangs + layered back cascade
       case 'long_wavy': {
-        // Flowing layered wavy back cascade with sculpted feathered tips
-        const backDrape = new THREE.Mesh(new THREE.CylinderGeometry(0.41, 0.47, 0.58, 16, 1, false, Math.PI * 0.96, Math.PI * 1.08), hairMat);
-        backDrape.position.set(0, -0.27, -0.05);
-        hairGroup.add(backDrape);
+        addCartoonSweptBangs(1, true);
+        addFaceFraming(0.1, 0.52, 0.375);
 
+        // Smooth nape drape that flows from the scalp instead of a floating tube
+        // Cylinder theta: 0 = +Z (face), PI/2..3PI/2 wraps the back half only
+        const drape = new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            0.405,
+            0.475,
+            0.66,
+            18,
+            1,
+            true,
+            Math.PI * 0.52,
+            Math.PI * 0.96,
+          ),
+          hairMat,
+        );
+        drape.position.set(0, -0.27, -0.02);
+        drape.scale.set(1.04, 1, 0.94);
+        hairGroup.add(drape);
+
+        // Alternating layered waves give the back a soft, non-tubular fall
         for (let i = -3; i <= 3; i++) {
+          const lean = i * 0.128;
           addTuft(
             curvedTuftGeo,
-            [i * 0.135, -0.22, -0.34 + Math.abs(i) * 0.045],
-            [-0.12, i * 0.22, Math.PI - i * 0.14],
-            [1.08, 0.66 - Math.abs(i) * 0.04, 0.82],
+            [lean, -0.24 - Math.abs(i) * 0.012, -0.365 + Math.abs(i) * 0.032],
+            [-0.08, i * 0.14, Math.PI - i * 0.09],
+            [1.06, 0.58 - Math.abs(i) * 0.028, 0.82],
+          );
+        }
+        // Gentle over-shoulder flips
+        for (const side of [-1, 1]) {
+          addTuft(
+            curvedTuftGeo,
+            [side * 0.4, -0.28, 0.015],
+            [0.14, -side * 0.3, Math.PI - side * 0.2],
+            [0.88, 0.44, 0.8],
           );
         }
         break;
       }
 
+      // 2. HIGH SLEEK PONYTAIL — pulled-back crown + bouncy tapered pony
       case 'ponytail': {
-        const tieMat = makeSatinMat('#FF4B6A', 0.35, 0.2);
-        const py = hatMode ? 0.03 : 0.22;
-        const tie = new THREE.Mesh(new THREE.TorusGeometry(0.088, 0.028, 8, 14), tieMat);
-        tie.position.set(0, py, -0.43);
-        hairGroup.add(tie);
+        // Slicked crown sweeps flowing back toward the tie
+        for (const i of [-1, 0, 1]) {
+          addTuft(
+            straightTuftGeo,
+            [i * 0.125, 0.315 - Math.abs(i) * 0.02 + crownLift, -0.02],
+            [-Math.PI / 2 + 0.38, -i * 0.22, 0],
+            [0.9, 0.54, 0.78],
+          );
+        }
+        // Cute face-framing wisps
+        for (const side of [-1, 1]) {
+          addTuft(
+            curvedTuftGeo,
+            [side * 0.335, -0.05, 0.215],
+            [0.1, -side * 0.32, Math.PI + side * 0.3],
+            [0.6, 0.4, 0.6],
+          );
+        }
 
-        // Swooping curved high ponytail composed of 3 layered tapered strands
-        addTuft(curvedTuftGeo, [0, py - 0.16, -0.52], [-0.42, 0, Math.PI], [1.45, 0.72, 1.15]);
-        addTuft(curvedTuftGeo, [-0.07, py - 0.2, -0.51], [-0.36, 0.18, Math.PI + 0.16], [0.95, 0.62, 0.9]);
-        addTuft(curvedTuftGeo, [0.07, py - 0.2, -0.51], [-0.36, -0.18, Math.PI - 0.16], [0.95, 0.62, 0.9]);
+        const py = (hatMode ? 0.03 : 0.15) + crownLift;
+        addTie('#FF4B6A', [0, py, -0.435], 0.24);
+
+        // Bouncy curved pony built from nested tapered locks
+        addTuft(curvedTuftGeo, [0.02, py - 0.15, -0.525], [-0.5, 0.06, Math.PI + 0.1], [1.48, 0.8, 1.16]);
+        addTuft(curvedTuftGeo, [-0.06, py - 0.17, -0.55], [-0.44, 0.18, Math.PI + 0.22], [1, 0.68, 0.94]);
+        addTuft(curvedTuftGeo, [0.09, py - 0.16, -0.55], [-0.48, -0.16, Math.PI - 0.2], [0.98, 0.64, 0.92]);
+        addTuft(curvedTuftGeo, [0.01, py - 0.3, -0.6], [-0.3, 0.02, Math.PI + 0.04], [1.1, 0.52, 0.92]);
         break;
       }
 
+      // 3. CUTE TWIN BUNS — center-parted bangs + symmetric rounded buns
       case 'twin_buns': {
-        const bandMat = makeSatinMat('#FACC15', 0.32, 0.35);
+        addCartoonSweptBangs(1, false);
+        addCartoonSweptBangs(-1, false);
+
+        const bunY = (hatMode ? 0.02 : 0.22) + crownLift;
+        const bunX = hatMode ? 0.4 : 0.375;
         for (const side of [-1, 1]) {
-          const bunY = hatMode ? 0.05 : 0.31;
-          const bunX = side * (hatMode ? 0.46 : 0.4);
-          const bun = new THREE.Mesh(new THREE.SphereGeometry(0.165, 14, 10), hairMat);
-          bun.position.set(bunX, bunY, -0.12);
-          const ring = new THREE.Mesh(new THREE.TorusGeometry(0.125, 0.024, 8, 14), bandMat);
-          ring.position.set(bunX * 0.88, bunY - 0.03, -0.12);
+          // Base wrap blends the bun softly into the scalp
+          addCurl([side * (bunX - 0.045), bunY - 0.075, -0.1], 0.135, [1.1, 0.9, 1]);
+          addCurl([side * bunX, bunY, -0.115], 0.165, [1.05, 1, 0.98]);
+          const ring = addTie('#FACC15', [side * (bunX - 0.02), bunY - 0.155, -0.105], 0.1);
           ring.rotation.y = Math.PI / 2;
-          ring.rotation.x = side * 0.45;
-          hairGroup.add(bun, ring);
+          ring.rotation.x = side * 0.42;
         }
+        // Soft nape coverage under the buns
+        addBackShell(Math.PI * 0.58, Math.PI * 0.3, -0.03, -0.01, [1.06, 1, 1.02]);
         break;
       }
 
+      // 4. CHIC CHIN-LENGTH BOB — smooth jaw-framing curve + side part
       case 'bob_cut': {
-        // Chic rounded chin-length bob curving smoothly inward around the jaw
+        addCartoonSweptBangs(1, false);
+        addBackShell(Math.PI * 0.42, Math.PI * 0.38, -0.055, -0.015, [1.14, 1, 1.08]);
+
         for (const side of [-1, 1]) {
+          // Cheek-length panels curving gently inward at the jaw
           addTuft(
             curvedTuftGeo,
-            [side * 0.41, -0.05, -0.02],
-            [0.04, -side * 0.12, Math.PI + side * 0.18],
-            [1.15, 0.45, 1.05],
+            [side * 0.405, -0.075, 0.055],
+            [0.04, -side * 0.12, Math.PI + side * 0.16],
+            [1.1, 0.46, 1.02],
           );
           addTuft(
             curvedTuftGeo,
-            [side * 0.35, -0.08, -0.18],
-            [-0.08, -side * 0.35, Math.PI + side * 0.12],
-            [1.1, 0.42, 0.95],
+            [side * 0.355, -0.145, -0.13],
+            [-0.06, -side * 0.3, Math.PI + side * 0.1],
+            [1.02, 0.4, 0.94],
           );
         }
-        const bobBack = new THREE.Mesh(new THREE.SphereGeometry(0.39, 16, 12), hairMat);
-        bobBack.scale.set(1.16, 0.78, 0.72);
-        bobBack.position.set(0, -0.15, -0.19);
-        hairGroup.add(bobBack);
+        // Rounded back volume closing the bob silhouette
+        addCurl([0, -0.2, -0.24], 0.3, [1.22, 0.72, 0.86]);
         break;
       }
 
+      // 5. SIDE BRAID — swept front hair flowing into a layered braid
       case 'side_braid': {
-        // Sculpted cascading braid draped neatly over the right shoulder
-        const tieMat = makeSatinMat('#FF4B6A', 0.38, 0.18);
-        for (let b = 0; b < 5; b++) {
-          const seg = new THREE.Mesh(new THREE.SphereGeometry(0.095 - b * 0.008, 10, 8), hairMat);
-          seg.scale.set(1.08, 0.95, 0.9);
-          seg.position.set(0.36 + Math.sin(b * 0.6) * 0.02, -0.08 - b * 0.115, -0.04 + b * 0.055);
-          hairGroup.add(seg);
+        addCartoonSweptBangs(1, true);
+        // Sweep everything toward the braid side for a natural parted look
+        addTuft(curvedTuftGeo, [0.34, 0.06, 0.16], [0.16, -0.24, Math.PI + 0.34], [0.92, 0.5, 0.8]);
+        addTuft(curvedTuftGeo, [-0.3, 0.1, 0.1], [0.2, 0.3, Math.PI - 0.26], [0.86, 0.46, 0.78]);
+        addBackShell(Math.PI * 0.46, Math.PI * 0.34, -0.05, -0.02, [1.08, 1, 1.05]);
+
+        // Sculpted braid: overlapping flattened segments hugging the shoulder
+        for (let b = 0; b < 6; b++) {
+          const t = b / 6;
+          addCurl(
+            [0.365 + Math.sin(b * 0.75) * 0.022, -0.09 - b * 0.098, 0.03 + t * 0.115],
+            0.098 - b * 0.007,
+            [1.12, 0.92, 0.88],
+            [0.2, 0.35, b % 2 === 0 ? 0.2 : -0.2],
+          );
         }
-        const tie = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.018, 6, 12), tieMat);
-        tie.rotation.x = Math.PI / 2;
-        tie.position.set(0.36, -0.62, 0.22);
-        hairGroup.add(tie);
-        addTuft(curvedTuftGeo, [0.36, -0.68, 0.23], [0.22, 0, Math.PI], [0.68, 0.22, 0.65]);
+        addTie('#FF4B6A', [0.385, -0.665, 0.15], Math.PI / 2);
+        addTuft(curvedTuftGeo, [0.385, -0.7, 0.155], [0.2, 0, Math.PI], [0.66, 0.22, 0.62]);
         break;
       }
 
+      // 6. FLUFFY CURLY VOLUME — harmonious layered clusters (no floating balls)
       case 'curly_volume': {
-        // Voluminous bouncing glam curls around sides & back
+        addCartoonSweptBangs(1, true);
+        // Smooth base so the curls read as one soft mass
+        addBackShell(Math.PI * 0.4, Math.PI * 0.42, -0.04, -0.02, [1.12, 1.04, 1.08]);
+
+        // Side clusters, mirrored and layered downward
         for (const side of [-1, 1]) {
-          for (let c = 0; c < 4; c++) {
-            const curl = new THREE.Mesh(new THREE.SphereGeometry(0.145 - c * 0.006, 10, 8), hairMat);
-            curl.position.set(
-              side * (0.37 + (c % 2) * 0.04),
-              0.04 - c * 0.15,
-              -0.08 - (c % 2) * 0.06,
+          for (let c = 0; c < 3; c++) {
+            addCurl(
+              [side * (0.335 + c * 0.018), 0.09 - c * 0.145, -0.06 - (c % 2) * 0.055],
+              0.145 - c * 0.012,
+              [1.02, 0.96, 1],
             );
-            hairGroup.add(curl);
           }
         }
+        // Back curls forming a soft rounded silhouette
         for (let i = -2; i <= 2; i++) {
-          const backCurl = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), hairMat);
-          backCurl.position.set(i * 0.14, -0.26 - (i % 2) * 0.08, -0.3 + Math.abs(i) * 0.04);
-          hairGroup.add(backCurl);
+          addCurl(
+            [i * 0.135, -0.235 - (Math.abs(i) % 2) * 0.055, -0.3 + Math.abs(i) * 0.04],
+            0.145,
+            [1, 0.94, 1],
+          );
         }
         if (!hatMode) {
           for (let i = -1; i <= 1; i++) {
-            const crownLift = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), hairMat);
-            crownLift.position.set(i * 0.16, 0.37, 0.02);
-            hairGroup.add(crownLift);
+            addCurl([i * 0.155, 0.345, 0.015], 0.15, [1.05, 0.86, 1.02]);
           }
+          addCurl([0, 0.375, -0.1], 0.155, [1.1, 0.9, 1.02]);
         }
         break;
       }
 
+      // 7. TWIN PIGTAILS — neat parted bangs + tapered curving pigtails
       case 'pigtails': {
-        const tieMat = makeSatinMat('#38B6FF', 0.35, 0.2);
-        for (const side of [-1, 1]) {
-          const py = hatMode ? -0.02 : 0.12;
-          const tie = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.024, 6, 12), tieMat);
-          tie.position.set(side * 0.44, py, -0.14);
-          tie.rotation.y = Math.PI / 2;
-          hairGroup.add(tie);
+        addCartoonSweptBangs(1, false);
+        addCartoonSweptBangs(-1, false);
 
+        const py = (hatMode ? -0.01 : 0.1) + crownLift;
+        for (const side of [-1, 1]) {
+          addTie('#38B6FF', [side * 0.425, py, -0.13], 0.15);
           addTuft(
             curvedTuftGeo,
-            [side * 0.52, py - 0.18, -0.16],
-            [-0.1, 0, Math.PI + side * 0.34],
-            [1.18, 0.62, 1.0],
+            [side * 0.505, py - 0.19, -0.155],
+            [-0.1, 0, Math.PI + side * 0.3],
+            [1.1, 0.66, 0.98],
           );
           addTuft(
             curvedTuftGeo,
-            [side * 0.48, py - 0.22, -0.22],
-            [-0.18, 0, Math.PI + side * 0.22],
-            [0.88, 0.54, 0.85],
+            [side * 0.475, py - 0.235, -0.215],
+            [-0.16, 0, Math.PI + side * 0.18],
+            [0.86, 0.52, 0.84],
           );
         }
+        // Soft nape bridging the two tails
+        addBackShell(Math.PI * 0.52, Math.PI * 0.32, -0.04, -0.02, [1.06, 1, 1.04]);
         break;
       }
 
+      // 8. LAYERED SHOULDER CUT — wispy bangs + inward-curving layers
       case 'layered_shoulder': {
-        // Feathered mid-length shoulder layers with playful outward-flipped tips
+        addCartoonSweptBangs(1, false);
+        addFaceFraming(0.11, 0.44, 0.36);
+        addBackShell(Math.PI * 0.44, Math.PI * 0.36, -0.06, -0.02, [1.1, 1, 1.06]);
+
+        // Feathered layers flip softly outward then in toward the shoulders
         for (let i = -3; i <= 3; i++) {
-          const sideSign = i === 0 ? 0 : Math.sign(i);
+          const lean = i * 0.132;
           addTuft(
             curvedTuftGeo,
-            [i * 0.135, -0.15, -0.33 + Math.abs(i) * 0.06],
-            [-0.25, i * 0.25, Math.PI + sideSign * 0.28],
-            [1.02, 0.46, 0.78],
+            [lean, -0.215, -0.34 + Math.abs(i) * 0.045],
+            [-0.16, i * 0.2, Math.PI + (i === 0 ? 0 : Math.sign(i) * 0.2)],
+            [0.98, 0.5, 0.8],
           );
         }
         for (const side of [-1, 1]) {
           addTuft(
             curvedTuftGeo,
-            [side * 0.42, -0.12, -0.02],
-            [0.05, -side * 0.15, Math.PI - side * 0.36],
-            [0.95, 0.42, 0.8],
+            [side * 0.405, -0.22, -0.01],
+            [0.06, -side * 0.22, Math.PI - side * 0.24],
+            [0.92, 0.48, 0.82],
           );
         }
         break;
       }
 
+      // 9. STYLISH PIXIE CUT — short crop, feathered top, tapered nape
       case 'pixie': {
-        // Chic short cropped feminine pixie with feathered top crown & tapered nape
-        if (!hatMode) {
-          addTuft(curvedTuftGeo, [-0.1, 0.36, 0.1], [-0.12, 0.15, -1.18], [0.95, 0.36, 0.82]);
-          addTuft(curvedTuftGeo, [0.1, 0.35, 0.04], [-0.18, -0.12, -1.35], [0.88, 0.32, 0.78]);
+        // Short side-swept fringe hugging the brow
+        addCartoonSweptBangs(1, false);
+        for (const side of [-1, 1]) {
+          addTuft(
+            straightTuftGeo,
+            [side * 0.335, -0.045, 0.185],
+            [0.08, -side * 0.3, Math.PI + side * 0.34],
+            [0.58, 0.34, 0.56],
+          );
         }
+        if (!hatMode) {
+          // Feathered crown tufts swept back and to one side
+          addTuft(curvedTuftGeo, [-0.1, 0.36, 0.09], [-0.16, 0.16, -1.2], [0.92, 0.34, 0.8]);
+          addTuft(curvedTuftGeo, [0.1, 0.35, 0.03], [-0.22, -0.14, -1.36], [0.86, 0.3, 0.76]);
+          addTuft(curvedTuftGeo, [0.02, 0.375, -0.1], [-0.3, 0.04, -1.48], [0.88, 0.3, 0.78]);
+        }
+        // Tapered nape hairline
         for (let i = -2; i <= 2; i++) {
           addTuft(
             straightTuftGeo,
-            [i * 0.115, -0.1, -0.355 + Math.abs(i) * 0.032],
-            [-0.2, i * 0.26, Math.PI - i * 0.1],
-            [0.62, 0.2, 0.56],
+            [i * 0.112, -0.115, -0.35 + Math.abs(i) * 0.032],
+            [-0.22, i * 0.26, Math.PI - i * 0.1],
+            [0.6, 0.2, 0.55],
           );
         }
         break;
       }
 
+      // 10. HALF-UP BOW — pulled-back upper + flowing lower waves + ribbon
       case 'half_up_bow':
       default: {
-        // Flowing lower waves + cute sculpted satin bow at the back crown
+        addCartoonSweptBangs(1, true);
+        // Upper hair swept smoothly back over the crown
+        for (let i = -1; i <= 1; i++) {
+          addTuft(
+            straightTuftGeo,
+            [i * 0.125, 0.315 - Math.abs(i) * 0.02 + crownLift, -0.03],
+            [-Math.PI / 2 + 0.42, -i * 0.22, 0],
+            [0.88, 0.5, 0.76],
+          );
+        }
+        addBackShell(Math.PI * 0.42, Math.PI * 0.36, -0.055, -0.02, [1.1, 1, 1.06]);
+
+        // Lower flowing waves, slightly narrower than the long-wavy cascade
         for (let i = -3; i <= 3; i++) {
           addTuft(
             curvedTuftGeo,
-            [i * 0.135, -0.2, -0.34 + Math.abs(i) * 0.045],
-            [-0.14, i * 0.22, Math.PI - i * 0.12],
-            [1.05, 0.6, 0.8],
+            [i * 0.13, -0.245, -0.355 + Math.abs(i) * 0.04],
+            [-0.1, i * 0.18, Math.PI - i * 0.1],
+            [1.02, 0.54, 0.8],
           );
         }
-        const bowMat = makeSatinMat('#FF3B5C', 0.32, 0.18);
-        const bowY = hatMode ? 0.04 : 0.2;
-        const bowZ = -0.435;
-        const knot = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), bowMat);
-        knot.position.set(0, bowY, bowZ);
-        hairGroup.add(knot);
-        for (const side of [-1, 1]) {
-          const loop = new THREE.Mesh(new THREE.SphereGeometry(0.095, 10, 8), bowMat);
-          loop.scale.set(1.35, 0.75, 0.52);
-          loop.position.set(side * 0.11, bowY + 0.015, bowZ - 0.01);
-          loop.rotation.z = side * 0.22;
-          const tail = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.16, 0.022), bowMat);
-          tail.position.set(side * 0.055, bowY - 0.095, bowZ - 0.015);
-          tail.rotation.z = -side * 0.24;
-          hairGroup.add(loop, tail);
-        }
+        // Cute satin bow pinned at the back crown
+        addBow([0, (hatMode ? 0.13 : 0.235) + crownLift, -0.435], hatMode ? 0.78 : 1);
         break;
+      }
+    }
+
+    // Delicate face-framing wisps for every non-pixie style that didn't add its own
+    if (
+      !isPixie &&
+      style.variant !== 'long_wavy' &&
+      style.variant !== 'layered_shoulder' &&
+      style.variant !== 'ponytail'
+    ) {
+      for (const side of [-1, 1]) {
+        addTuft(
+          curvedTuftGeo,
+          [side * 0.405, 0.005, 0.115],
+          [0.08, -side * 0.2, Math.PI + side * 0.1],
+          [0.66, 0.4, 0.64],
+        );
       }
     }
   }

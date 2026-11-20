@@ -45,6 +45,11 @@ export interface TranslationDictionary {
   rotateLeft: string;
   rotateRight: string;
   dragToRotate: string;
+  zoomFullBody: string;
+  zoomFaceHair: string;
+  randomizeLook: string;
+  resetLook: string;
+  resetView: string;
   customizeCharacter: string;
   wardrobe: string;
   tabSuits: string;
@@ -231,6 +236,11 @@ export const DICTIONARY: Record<Language, TranslationDictionary> = {
     rotateLeft: 'Rotate Left',
     rotateRight: 'Rotate Right',
     dragToRotate: 'Drag to spin 360°',
+    zoomFullBody: 'Full Body',
+    zoomFaceHair: 'Face & Hair',
+    randomizeLook: 'Randomize',
+    resetLook: 'Reset',
+    resetView: 'Reset View',
     customizeCharacter: 'Customize Your Character',
     wardrobe: 'Wardrobe',
     tabSuits: 'Suits',
@@ -344,6 +354,7 @@ export const DICTIONARY: Record<Language, TranslationDictionary> = {
         'Undercut',
         'Afro',
         'Long Layered',
+        'Bald',
       ],
       female: [
         'Long Wavy',
@@ -356,6 +367,7 @@ export const DICTIONARY: Record<Language, TranslationDictionary> = {
         'Layered Shoulder',
         'Pixie Cut',
         'Half-Up Bow',
+        'Bald',
       ],
     },
     roles: {
@@ -628,6 +640,11 @@ export const DICTIONARY: Record<Language, TranslationDictionary> = {
     rotateLeft: 'تدوير لليسار',
     rotateRight: 'تدوير لليمين',
     dragToRotate: 'اسحب للتدوير 360°',
+    zoomFullBody: 'الجسم كامل',
+    zoomFaceHair: 'الوجه والشعر',
+    randomizeLook: 'عشوائي',
+    resetLook: 'إعادة ضبط',
+    resetView: 'توسيط الكاميرا',
     customizeCharacter: 'خصص شخصيتك',
     wardrobe: 'خزانة الملابس',
     tabSuits: 'بدلات',
@@ -741,6 +758,7 @@ export const DICTIONARY: Record<Language, TranslationDictionary> = {
         'قصة عصرية',
         'أفرو مجعد',
         'طويل متدرج',
+        'أصلع',
       ],
       female: [
         'طويل مموج',
@@ -753,6 +771,7 @@ export const DICTIONARY: Record<Language, TranslationDictionary> = {
         'متدرج للكتف',
         'قصة قصيرة عصرية',
         'نصف مرفوع بفيونكة',
+        'أصلع',
       ],
     },
     roles: {

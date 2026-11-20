@@ -657,162 +657,377 @@ export function HairThumbSvg({
   hairColor: string;
   className?: string;
 }) {
-  const variant = HAIR_CATALOG[gender][hairId % 10].variant;
+  const catalog = HAIR_CATALOG[gender];
+  const variant = catalog[hairId % catalog.length].variant;
   const hi = shadeHex(hairColor, 1.32);
   const dark = shadeHex(hairColor, 0.72);
+  const isFemale = gender === 'female';
+
+  // Smooth skull cap used by nearly every style (shared silhouette)
+  const renderCap = () => (
+    <path
+      d="M18 47C17 26 27 16 40 16C53 16 63 26 62 47C56 36 49 32 41 32C32 32 25 36 18 47Z"
+      fill={hairColor}
+      stroke="#0F0A24"
+      strokeWidth="2.2"
+      strokeLinejoin="round"
+    />
+  );
+
+  const renderHighlights = () => (
+    <path
+      d="M27 24C33 19.5 46 19.5 53 24"
+      stroke={hi}
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeOpacity="0.6"
+    />
+  );
+
+  const renderBackHair = () => {
+    switch (variant) {
+      case 'long_wavy':
+        return (
+          <path
+            d="M16 38C11 52 13 70 23 76C32 72 30 60 31 50C35 56 45 56 49 50C50 60 48 72 57 76C67 70 69 52 64 38Z"
+            fill={dark}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+            strokeLinejoin="round"
+          />
+        );
+      case 'long_layered':
+        return (
+          <path
+            d="M18 36C15 48 17 60 25 66H55C63 60 65 48 62 36Z"
+            fill={dark}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+          />
+        );
+      case 'curly_volume':
+        return (
+          <g fill={dark} stroke="#0F0A24" strokeWidth="2">
+            <circle cx="18" cy="46" r="11" />
+            <circle cx="62" cy="46" r="11" />
+            <circle cx="24" cy="62" r="10" />
+            <circle cx="56" cy="62" r="10" />
+            <circle cx="40" cy="68" r="10.5" />
+          </g>
+        );
+      case 'layered_shoulder':
+        return (
+          <path
+            d="M17 38C13 50 17 62 25 67C33 62 30 52 31 44C37 50 45 50 49 44C50 52 47 62 55 67C63 62 67 50 63 38Z"
+            fill={dark}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+            strokeLinejoin="round"
+          />
+        );
+      case 'half_up_bow':
+        return (
+          <path
+            d="M17 38C13 52 15 68 24 74H56C65 68 67 52 63 38Z"
+            fill={dark}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+          />
+        );
+      case 'ponytail':
+        return (
+          <path
+            d="M55 22C68 24 72 44 64 64C58 58 57 46 55 34Z"
+            fill={dark}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+            strokeLinejoin="round"
+          />
+        );
+      case 'pigtails':
+        return (
+          <g fill={dark} stroke="#0F0A24" strokeWidth="2.1">
+            <path d="M23 34C11 38 9 54 15 66C21 62 22 50 24 42Z" />
+            <path d="M57 34C69 38 71 54 65 66C59 62 58 50 56 42Z" />
+          </g>
+        );
+      case 'twin_buns':
+        return (
+          <g fill={hairColor} stroke="#0F0A24" strokeWidth="2.2">
+            <circle cx="19" cy="24" r="10" />
+            <circle cx="61" cy="24" r="10" />
+          </g>
+        );
+      case 'bob_cut':
+        return (
+          <path
+            d="M17 38C14 52 18 62 25 65C28 58 26 48 27 42H53C54 48 52 58 55 65C62 62 66 52 63 38Z"
+            fill={dark}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+            strokeLinejoin="round"
+          />
+        );
+      case 'side_braid':
+        return (
+          <g fill={dark} stroke="#0F0A24" strokeWidth="2">
+            <path d="M17 38C14 50 18 62 25 66H53C50 58 51 48 53 40Z" />
+            <circle cx="58" cy="50" r="6" />
+            <circle cx="61" cy="60" r="5.4" />
+            <circle cx="58" cy="69" r="4.6" />
+          </g>
+        );
+      case 'pixie':
+        return (
+          <path
+            d="M20 42C20 28 29 22 40 22C51 22 60 28 60 42C54 34 47 32 40 32C33 32 27 34 20 42Z"
+            fill={dark}
+            stroke="#0F0A24"
+            strokeWidth="2.1"
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderStyle = () => {
+    switch (variant) {
+      case 'bald':
+        return (
+          <path
+            d="M27 26C32 20 48 20 53 26"
+            stroke="#FFFFFF"
+            strokeOpacity="0.32"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+          />
+        );
+      case 'side_part':
+        return (
+          <>
+            {renderCap()}
+            <path
+              d="M20 40C26 30 46 26 58 34C52 30 34 34 27 42Z"
+              fill={hairColor}
+              stroke="#0F0A24"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+          </>
+        );
+      case 'spiky':
+        return (
+          <path
+            d="M18 44C17 28 24 19 32 14L36 22L44 12L48 22L58 17L56 28C62 32 63 40 61 45C56 36 48 34 40 34C31 34 23 36 18 44Z"
+            fill={hairColor}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+            strokeLinejoin="round"
+          />
+        );
+      case 'pompadour':
+        return (
+          <path
+            d="M19 45C17 27 25 13 44 14C60 15 65 26 60 44C55 34 46 31 33 34C25 35 22 39 19 45Z"
+            fill={hairColor}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+          />
+        );
+      case 'afro':
+        return (
+          <path
+            d="M16 46C9 36 13 18 26 15C33 8 47 8 54 15C67 18 71 36 64 46C58 34 49 32 40 32C31 32 22 34 16 46Z"
+            fill={hairColor}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+          />
+        );
+      case 'buzz':
+        return (
+          <path
+            d="M20 42C20 27 29 21 40 21C51 21 60 27 60 42C53 34 47 32 40 32C33 32 27 34 20 42Z"
+            fill={hairColor}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+          />
+        );
+      case 'messy':
+      case 'curly_top':
+        return (
+          <path
+            d="M18 45C16 28 24 16 38 16C52 15 63 24 62 44C56 37 51 39 46 34C41 39 34 35 29 39C24 38 21 41 18 45Z"
+            fill={hairColor}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+          />
+        );
+      case 'slick_back':
+      case 'undercut':
+        return (
+          <path
+            d="M20 44C18 24 28 15 41 15C55 15 62 24 60 44C54 33 48 30 40 30C32 30 26 33 20 44Z"
+            fill={hairColor}
+            stroke="#0F0A24"
+            strokeWidth="2.2"
+          />
+        );
+      case 'long_wavy':
+        return (
+          <>
+            {renderCap()}
+            <path
+              d="M18 34C24 25 40 22 53 28C48 26 30 30 24 44Z"
+              fill={hi}
+              opacity="0.35"
+            />
+          </>
+        );
+      case 'ponytail':
+        return (
+          <>
+            <path
+              d="M18 44C18 24 28 15 41 15C55 15 62 24 60 42C54 31 47 28 40 28C32 28 24 33 18 44Z"
+              fill={hairColor}
+              stroke="#0F0A24"
+              strokeWidth="2.2"
+            />
+            <ellipse cx="57" cy="28" rx="4" ry="3.2" fill="#FF4B6A" stroke="#0F0A24" strokeWidth="1.5" />
+          </>
+        );
+      case 'twin_buns':
+        return (
+          <>
+            {renderCap()}
+            <path d="M40 17V32" stroke={dark} strokeWidth="2" strokeLinecap="round" />
+            <circle cx="19" cy="24" r="4" fill="#FACC15" stroke="#0F0A24" strokeWidth="1.4" />
+            <circle cx="61" cy="24" r="4" fill="#FACC15" stroke="#0F0A24" strokeWidth="1.4" />
+          </>
+        );
+      case 'bob_cut':
+        return (
+          <>
+            {renderCap()}
+            <path
+              d="M20 42C19 54 22 62 27 63L26 46Z"
+              fill={hairColor}
+              stroke="#0F0A24"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M60 42C61 54 58 62 53 63L54 46Z"
+              fill={hairColor}
+              stroke="#0F0A24"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+          </>
+        );
+      case 'side_braid':
+        return (
+          <>
+            {renderCap()}
+            <path
+              d="M22 36C30 26 50 26 56 36C50 32 30 32 22 36Z"
+              fill={hi}
+              opacity="0.28"
+            />
+            <circle cx="58" cy="73" r="2.4" fill="#FF4B6A" stroke="#0F0A24" strokeWidth="1.2" />
+          </>
+        );
+      case 'curly_volume':
+        return (
+          <g fill={hairColor} stroke="#0F0A24" strokeWidth="2">
+            <circle cx="24" cy="30" r="9" />
+            <circle cx="40" cy="22" r="10" />
+            <circle cx="56" cy="30" r="9" />
+            <circle cx="20" cy="42" r="7" />
+            <circle cx="60" cy="42" r="7" />
+          </g>
+        );
+      case 'pigtails':
+        return (
+          <>
+            {renderCap()}
+            <circle cx="24" cy="40" r="3.6" fill="#38B6FF" stroke="#0F0A24" strokeWidth="1.4" />
+            <circle cx="56" cy="40" r="3.6" fill="#38B6FF" stroke="#0F0A24" strokeWidth="1.4" />
+          </>
+        );
+      case 'layered_shoulder':
+        return (
+          <>
+            {renderCap()}
+            <path
+              d="M18 44C20 56 24 62 30 63C27 56 26 50 25 44Z"
+              fill={hairColor}
+              stroke="#0F0A24"
+              strokeWidth="2"
+            />
+            <path
+              d="M62 44C60 56 56 62 50 63C53 56 54 50 55 44Z"
+              fill={hairColor}
+              stroke="#0F0A24"
+              strokeWidth="2"
+            />
+          </>
+        );
+      case 'pixie':
+        return (
+          <>
+            <path
+              d="M19 44C18 26 28 17 41 17C54 17 63 26 61 44C56 34 50 31 42 31C33 31 24 35 19 44Z"
+              fill={hairColor}
+              stroke="#0F0A24"
+              strokeWidth="2.2"
+            />
+            <path
+              d="M50 20C58 21 62 27 60 34C57 27 53 23 48 22Z"
+              fill={hi}
+              opacity="0.4"
+            />
+          </>
+        );
+      case 'half_up_bow':
+        return (
+          <>
+            {renderCap()}
+            <g>
+              <path d="M30 16L40 21L30 25Z" fill="#FF3B5C" stroke="#0F0A24" strokeWidth="1.6" />
+              <path d="M50 16L40 21L50 25Z" fill="#FF3B5C" stroke="#0F0A24" strokeWidth="1.6" />
+              <circle cx="40" cy="20.5" r="2.6" fill="#FF6B84" stroke="#0F0A24" strokeWidth="1.3" />
+            </g>
+          </>
+        );
+      default:
+        return renderCap();
+    }
+  };
 
   return (
     <svg viewBox="0 0 80 80" fill="none" className={className} aria-hidden="true">
-      {/* Back hair behind head for long styles */}
-      {(variant === 'long_wavy' ||
-        variant === 'curly_volume' ||
-        variant === 'layered_shoulder' ||
-        variant === 'half_up_bow' ||
-        variant === 'long_layered') && (
-        <path
-          d={
-            variant === 'long_layered' || variant === 'layered_shoulder'
-              ? 'M18 36C15 48 17 60 25 65H55C63 60 65 48 62 36Z'
-              : 'M17 36C13 50 15 67 24 72H56C65 67 67 50 63 36Z'
-          }
-          fill={dark}
-          stroke="#0F0A24"
-          strokeWidth="2.2"
-        />
-      )}
-      {gender === 'female' && variant === 'ponytail' && (
-        <path
-          d="M52 24C66 26 70 46 62 64C56 58 55 46 53 36Z"
-          fill={dark}
-          stroke="#0F0A24"
-          strokeWidth="2.2"
-        />
-      )}
-      {gender === 'female' && variant === 'pigtails' && (
-        <>
-          <path d="M21 36C10 40 9 56 15 66C20 62 21 52 22 44Z" fill={dark} stroke="#0F0A24" strokeWidth="2.1" />
-          <path d="M59 36C70 40 71 56 65 66C60 62 59 52 58 44Z" fill={dark} stroke="#0F0A24" strokeWidth="2.1" />
-        </>
-      )}
-      {gender === 'female' && variant === 'twin_buns' && (
-        <>
-          <circle cx="19" cy="24" r="10" fill={hairColor} stroke="#0F0A24" strokeWidth="2.2" />
-          <circle cx="61" cy="24" r="10" fill={hairColor} stroke="#0F0A24" strokeWidth="2.2" />
-        </>
-      )}
-      {gender === 'female' && variant === 'half_up_bow' && (
-        <g>
-          <path d="M30 16L40 21L30 25Z" fill="#FF3B5C" stroke="#0F0A24" strokeWidth="1.6" />
-          <path d="M50 16L40 21L50 25Z" fill="#FF3B5C" stroke="#0F0A24" strokeWidth="1.6" />
-          <circle cx="40" cy="20.5" r="2.6" fill="#FF6B84" stroke="#0F0A24" strokeWidth="1.3" />
-        </g>
-      )}
+      {renderBackHair()}
 
       {/* Subtle mannequin head silhouette */}
-      <circle cx="40" cy="46" r="20" fill="#F2C8A5" stroke="#0F0A24" strokeWidth="2" />
+      <circle cx="40" cy="46" r="20" fill={isFemale ? '#F6CDAA' : '#F2C8A5'} stroke="#0F0A24" strokeWidth="2" />
       {/* Cute minimal eyes */}
       <circle cx="33" cy="48" r="2.2" fill="#1C1429" />
       <circle cx="47" cy="48" r="2.2" fill="#1C1429" />
       <path d="M36 55C38.5 57.5 41.5 57.5 44 55" stroke="#7A4430" strokeWidth="1.8" strokeLinecap="round" />
 
-      {/* Main Hair Cap & Style Shape */}
-      {variant === 'spiky' && (
-        <path
-          d="M18 44C17 28 24 19 32 14L36 22L44 12L48 22L58 17L56 28C62 32 63 40 61 45C56 36 48 34 40 34C31 34 23 36 18 44Z"
-          fill={hairColor}
-          stroke="#0F0A24"
-          strokeWidth="2.2"
-          strokeLinejoin="round"
-        />
-      )}
-      {variant === 'pompadour' && (
-        <path
-          d="M19 45C17 27 25 13 44 14C60 15 65 26 60 44C55 34 46 31 33 34C25 35 22 39 19 45Z"
-          fill={hairColor}
-          stroke="#0F0A24"
-          strokeWidth="2.2"
-        />
-      )}
-      {variant === 'side_part' && (
-        <path
-          d="M18 45C17 26 27 18 41 18C55 18 63 27 61 45C56 35 47 32 34 36L28 29L25 38C22 40 20 42 18 45Z"
-          fill={hairColor}
-          stroke="#0F0A24"
-          strokeWidth="2.2"
-        />
-      )}
-      {(variant === 'afro' || variant === 'curly_volume') && (
-        <path
-          d="M16 46C9 36 13 18 26 15C33 8 47 8 54 15C67 18 71 36 64 46C58 34 49 32 40 32C31 32 22 34 16 46Z"
-          fill={hairColor}
-          stroke="#0F0A24"
-          strokeWidth="2.2"
-        />
-      )}
-      {variant === 'buzz' && (
-        <path
-          d="M20 42C20 27 29 21 40 21C51 21 60 27 60 42C53 34 47 32 40 32C33 32 27 34 20 42Z"
-          fill={hairColor}
-          stroke="#0F0A24"
-          strokeWidth="2.2"
-        />
-      )}
-      {(variant === 'messy' || variant === 'curly_top') && (
-        <path
-          d="M18 45C16 28 24 16 38 16C52 15 63 24 62 44C56 37 51 39 46 34C41 39 34 35 29 39C24 38 21 41 18 45Z"
-          fill={hairColor}
-          stroke="#0F0A24"
-          strokeWidth="2.2"
-        />
-      )}
-      {(variant === 'slick_back' || variant === 'undercut') && (
-        <path
-          d="M20 44C18 24 28 15 41 15C55 15 62 24 60 44C54 33 48 30 40 30C32 30 26 33 20 44Z"
-          fill={hairColor}
-          stroke="#0F0A24"
-          strokeWidth="2.2"
-        />
-      )}
-      {(variant === 'long_wavy' ||
-        variant === 'long_layered' ||
-        variant === 'ponytail' ||
-        variant === 'twin_buns' ||
-        variant === 'bob_cut' ||
-        variant === 'side_braid' ||
-        variant === 'pigtails' ||
-        variant === 'layered_shoulder' ||
-        variant === 'pixie' ||
-        variant === 'half_up_bow') && (
-        <path
-          d="M18 48C17 26 27 17 40 17C53 17 63 26 62 48C56 38 49 34 41 34C32 34 25 38 18 48Z"
-          fill={hairColor}
-          stroke="#0F0A24"
-          strokeWidth="2.2"
-        />
-      )}
-      {variant === 'bob_cut' && (
+      {/* Ears stay visible for short / bald styles */}
+      {(variant === 'bald' || variant === 'pixie' || variant === 'buzz') && (
         <>
-          <path d="M18 42C16 52 19 60 25 62L24 44Z" fill={hairColor} stroke="#0F0A24" strokeWidth="2" />
-          <path d="M62 42C64 52 61 60 55 62L56 44Z" fill={hairColor} stroke="#0F0A24" strokeWidth="2" />
-        </>
-      )}
-      {variant === 'side_braid' && (
-        <>
-          <circle cx="57" cy="54" r="5" fill={hairColor} stroke="#0F0A24" strokeWidth="1.7" />
-          <circle cx="59" cy="62" r="4.6" fill={hairColor} stroke="#0F0A24" strokeWidth="1.7" />
-          <circle cx="57" cy="69" r="3.8" fill={hairColor} stroke="#0F0A24" strokeWidth="1.6" />
-          <circle cx="57" cy="72" r="2.2" fill="#FF4B6A" />
+          <circle cx="19.5" cy="47" r="4" fill="#F2C8A5" stroke="#0F0A24" strokeWidth="1.8" />
+          <circle cx="60.5" cy="47" r="4" fill="#F2C8A5" stroke="#0F0A24" strokeWidth="1.8" />
         </>
       )}
 
+      {renderStyle()}
+
       {/* Glossy cartoon hair highlight */}
-      <path
-        d="M29 25C35 21 45 21 51 25"
-        stroke={hi}
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeOpacity="0.6"
-      />
+      {variant !== 'bald' && renderHighlights()}
     </svg>
   );
 }
@@ -981,6 +1196,11 @@ export function ChibiPortraitSvg({
   const hairDark = shadeHex(appearance.hairColor, 0.72);
   const skinShadow = shadeHex(appearance.skinColor, 0.88);
   const isFemale = appearance.gender === 'female';
+  const hairStyle =
+    HAIR_CATALOG[appearance.gender][
+      appearance.hairId % HAIR_CATALOG[appearance.gender].length
+    ];
+  const isBald = hairStyle.variant === 'bald';
 
   return (
     <svg viewBox="0 0 88 88" fill="none" className={className} aria-hidden="true">
@@ -994,8 +1214,8 @@ export function ChibiPortraitSvg({
       <path d="M35 63H53L44 82L35 63Z" fill={suit.secondary} />
       <path d="M42 66H46L47.5 81L44 84L40.5 81L42 66Z" fill={suit.accent} />
 
-      {/* Back Hair (female long hair) */}
-      {isFemale && (
+      {/* Back Hair (female long hair, skipped entirely when bald) */}
+      {isFemale && !isBald && hairStyle.variant !== 'pixie' && (
         <path
           d="M20 42C16 58 19 72 28 76H60C69 72 72 58 68 42Z"
           fill={hairDark}
@@ -1053,14 +1273,16 @@ export function ChibiPortraitSvg({
       <circle cx="44" cy="47.5" r="1.4" fill={skinShadow} />
       <path d="M39 53C41.5 56 46.5 56 49 53" stroke="#7A3D30" strokeWidth="2.2" strokeLinecap="round" />
 
-      {/* Hair Bangs */}
-      <path
-        d="M22 36C22 21 32 16 44 16C56 16 66 21 66 36C61 29 55 28 49 31L44 26L38 32C32 28 27 30 22 36Z"
-        fill={appearance.hairColor}
-        stroke="#0F0A24"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
+      {/* Hair Bangs (bald heads keep a clean skin dome) */}
+      {!isBald && (
+        <path
+          d="M22 36C22 21 32 16 44 16C56 16 66 21 66 36C61 29 55 28 49 31L44 26L38 32C32 28 27 30 22 36Z"
+          fill={appearance.hairColor}
+          stroke="#0F0A24"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+      )}
 
       {/* Crisp Mini Hat sitting cleanly over hairline (omitted when hatId === 'none') */}
       {hat && (

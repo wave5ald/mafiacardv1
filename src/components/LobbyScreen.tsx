@@ -9,11 +9,15 @@ import {
   Clock,
   Copy,
   Crown,
+  Dices,
   Globe,
   Lock,
   Palette,
+  PersonStanding,
   Play,
   Plus,
+  RotateCcw,
+  ScanFace,
   Search,
   Settings,
   Shield,
@@ -27,8 +31,10 @@ import {
 } from 'lucide-react';
 import { audioSynth } from '../audio/synth';
 import {
+  BALD_HAIR_ID,
   DEFAULT_APPEARANCE,
   getDefaultAppearanceForGender,
+  getRandomAppearanceForGender,
   HAIR_CATALOG,
   HAIR_COLORS,
   HAT_CATALOG,
@@ -46,7 +52,7 @@ import {
   RoomViewState,
   ValidationErrorPayload,
 } from '../shared/types';
-import { CharacterPreviewCanvas } from '../three/CharacterPreviewCanvas';
+import { CharacterPreviewCanvas, PreviewZoom } from '../three/CharacterPreviewCanvas';
 import {
   ChibiPortraitSvg,
   HairThumbSvg,
@@ -97,6 +103,7 @@ export function LobbyScreen({
   const appearance = mePlayer?.appearance ?? DEFAULT_APPEARANCE;
 
   const [activeTab, setActiveTab] = useState<WardrobeTab>('suits');
+  const [zoom, setZoom] = useState<PreviewZoom>('full');
   const [rotSignal, setRotSignal] = useState<{ dir: -1 | 1; seq: number }>({ dir: 1, seq: 0 });
   const [copied, setCopied] = useState(false);
   const [startError, setStartError] = useState<ValidationErrorPayload['code'] | null>(null);
@@ -132,6 +139,16 @@ export function LobbyScreen({
         hairColor: appearance.hairColor,
       }),
     );
+  };
+
+  const handleRandomizeLook = () => {
+    audioSynth.click();
+    onUpdateAppearance(getRandomAppearanceForGender(appearance.gender));
+  };
+
+  const handleResetLook = () => {
+    audioSynth.click();
+    onUpdateAppearance(getDefaultAppearanceForGender(appearance.gender));
   };
 
   const handleStartClick = async () => {
@@ -182,7 +199,13 @@ export function LobbyScreen({
         })),
       ];
     }
-    return HAIR_CATALOG[appearance.gender].map((_item, idx) => ({
+    // "Bald" is always the very first tile, then the 10 sculpted styles
+    const hairIds = HAIR_CATALOG[appearance.gender].map((_item, idx) => idx);
+    const orderedHairIds = [
+      BALD_HAIR_ID,
+      ...hairIds.filter((id) => id !== BALD_HAIR_ID),
+    ];
+    return orderedHairIds.map((idx) => ({
       id: idx,
       label: t.hairs[appearance.gender][idx],
       selected: appearance.hairId === idx,
@@ -197,6 +220,13 @@ export function LobbyScreen({
       ),
     }));
   })();
+
+  const wardrobeCounts: Record<WardrobeTab, number> = {
+    suits: SUIT_CATALOG[appearance.gender].length,
+    pants: PANTS_CATALOG[appearance.gender].length,
+    hats: HAT_CATALOG.length + 1,
+    hair: HAIR_CATALOG[appearance.gender].length,
+  };
 
   const timerRows = [
     { key: 'mafiaTimeSec' as const, label: t.mafiaTime, min: 15, max: 60, icon: Clock, color: 'text-[#FF6B84]' },
@@ -381,7 +411,7 @@ export function LobbyScreen({
             background: 'linear-gradient(180deg, #21174E 0%, #171038 100%)',
           }}
         >
-          <div className="flex items-start justify-between gap-2 z-10 text-start">
+          <div className="z-10 text-start space-y-2">
             <div>
               <h1 className="font-display font-extrabold text-lg sm:text-xl text-white leading-tight">
                 {t.customizeCharacter}
@@ -390,11 +420,78 @@ export function LobbyScreen({
                 {mePlayer?.name} · {t.dragToRotate}
               </span>
             </div>
+
+            {/* Preview controls: zoom framing, randomize & reset */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div
+                role="group"
+                aria-label={t.customizeCharacter}
+                className="inline-flex items-center gap-0.5 p-0.5 rounded-xl bg-[#241A52] border border-purple-300/25"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    audioSynth.click();
+                    setZoom('full');
+                  }}
+                  aria-pressed={zoom === 'full'}
+                  className={`min-h-[32px] px-2 py-1 rounded-lg text-[11px] font-extrabold inline-flex items-center gap-1 transition-colors ${
+                    zoom === 'full'
+                      ? 'bg-[#FACC15] text-[#181036] shadow-[0_2px_10px_rgba(250,204,21,0.4)]'
+                      : 'text-purple-200 hover:bg-[#31246E]'
+                  }`}
+                >
+                  <PersonStanding className="w-3.5 h-3.5" />
+                  <span>{t.zoomFullBody}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    audioSynth.click();
+                    setZoom('face');
+                  }}
+                  aria-pressed={zoom === 'face'}
+                  className={`min-h-[32px] px-2 py-1 rounded-lg text-[11px] font-extrabold inline-flex items-center gap-1 transition-colors ${
+                    zoom === 'face'
+                      ? 'bg-[#FACC15] text-[#181036] shadow-[0_2px_10px_rgba(250,204,21,0.4)]'
+                      : 'text-purple-200 hover:bg-[#31246E]'
+                  }`}
+                >
+                  <ScanFace className="w-3.5 h-3.5" />
+                  <span>{t.zoomFaceHair}</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRandomizeLook}
+                aria-label={t.randomizeLook}
+                title={t.randomizeLook}
+                className="min-h-[34px] px-2.5 py-1 rounded-xl bg-[#241A52] hover:bg-[#33256B] border border-purple-300/25 text-[11px] font-extrabold text-purple-100 inline-flex items-center gap-1 transition-colors"
+              >
+                <Dices className="w-3.5 h-3.5 text-[#FACC15]" />
+                <span>{t.randomizeLook}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleResetLook}
+                aria-label={t.resetLook}
+                title={t.resetLook}
+                className="min-h-[34px] px-2.5 py-1 rounded-xl bg-[#241A52] hover:bg-[#33256B] border border-purple-300/25 text-[11px] font-extrabold text-purple-100 inline-flex items-center gap-1 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-[#7FD3FF]" />
+                <span>{t.resetLook}</span>
+              </button>
+            </div>
           </div>
 
           {/* 3D Character Turntable with clean < and > arrows on left/right */}
           <div className="w-full h-[320px] sm:h-[380px] lg:h-[470px] relative my-1">
-            <CharacterPreviewCanvas appearance={appearance} rotationStepSignal={rotSignal} />
+            <CharacterPreviewCanvas
+              appearance={appearance}
+              rotationStepSignal={rotSignal}
+              zoom={zoom}
+            />
 
             <button
               type="button"
@@ -443,19 +540,29 @@ export function LobbyScreen({
                     audioSynth.click();
                     setActiveTab(tabKey);
                   }}
-                  className={`min-h-[42px] px-2 py-1.5 rounded-xl font-display text-xs sm:text-sm font-extrabold transition-all whitespace-nowrap ${
+                  aria-pressed={activeTab === tabKey}
+                  className={`min-h-[42px] px-1.5 py-1.5 rounded-xl font-display text-xs sm:text-sm font-extrabold transition-all whitespace-nowrap inline-flex items-center justify-center gap-1 ${
                     activeTab === tabKey
                       ? 'bg-[#FACC15] text-[#181036] shadow-[0_6px_18px_rgba(250,204,21,0.38)]'
                       : 'bg-[#2B205C] text-purple-100 hover:bg-[#392B78] border border-purple-300/20'
                   }`}
                 >
-                  {label}
+                  <span>{label}</span>
+                  <span
+                    className={`min-w-[16px] px-1 rounded-full text-[9px] font-extrabold tabular-nums ${
+                      activeTab === tabKey
+                        ? 'bg-[#181036]/20 text-[#181036]'
+                        : 'bg-black/25 text-purple-200'
+                    }`}
+                  >
+                    {wardrobeCounts[tabKey]}
+                  </span>
                 </button>
               ))}
             </div>
 
             {/* 4-Column Illustrated Wardrobe Grid (all 10 variants scrollable cleanly) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-h-[268px] overflow-y-auto mafia-scroll pe-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-h-[300px] overflow-y-auto overscroll-contain mafia-scroll pe-1">
               {wardrobeItems.map((item) => (
                 <button
                   key={item.id}
@@ -577,11 +684,12 @@ export function LobbyScreen({
                         key={hex}
                         type="button"
                         aria-label={`${t.skinTone} ${hex}`}
+                        aria-pressed={active}
                         onClick={() => patchAppearance({ skinColor: hex })}
-                        className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${
                           active
                             ? 'border-[#FACC15] ring-2 ring-[#FACC15]/70 shadow-[0_0_12px_rgba(250,204,21,0.75)] scale-110'
-                            : 'border-white/30 hover:scale-105'
+                            : 'border-white/30 hover:scale-110 hover:border-[#FACC15]/70 hover:ring-2 hover:ring-[#FACC15]/25'
                         }`}
                         style={{ backgroundColor: hex }}
                       />
@@ -601,11 +709,12 @@ export function LobbyScreen({
                         key={hex}
                         type="button"
                         aria-label={`${t.hairColor} ${hex}`}
+                        aria-pressed={active}
                         onClick={() => patchAppearance({ hairColor: hex })}
-                        className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${
                           active
                             ? 'border-[#FACC15] ring-2 ring-[#FACC15]/70 shadow-[0_0_12px_rgba(250,204,21,0.75)] scale-110'
-                            : 'border-white/30 hover:scale-105'
+                            : 'border-white/30 hover:scale-110 hover:border-[#FACC15]/70 hover:ring-2 hover:ring-[#FACC15]/25'
                         }`}
                         style={{ backgroundColor: hex }}
                       />

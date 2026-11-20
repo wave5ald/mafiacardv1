@@ -17,7 +17,19 @@ interface GameSceneCanvasProps {
   canPickPlayer: boolean;
   selectedPlayerIds: string[];
   onSelectPlayer: (playerId: string) => void;
+  /** Increment to smoothly recenter the free-look camera (HUD button). */
+  recenterSignal?: number;
 }
+
+// Free-look limits: wide enough to face the neighbours on both sides
+const MAX_YAW = THREE.MathUtils.degToRad(135);
+const MIN_PITCH = THREE.MathUtils.degToRad(-30);
+const MAX_PITCH = THREE.MathUtils.degToRad(45);
+const HOVER_YAW = THREE.MathUtils.degToRad(8);
+const HOVER_PITCH = THREE.MathUtils.degToRad(4);
+const DRAG_YAW_SPEED = 0.0045;
+const DRAG_PITCH_SPEED = 0.0034;
+const CLICK_SLOP_PX = 6;
 
 interface SeatActor {
   playerId: string;
@@ -45,8 +57,11 @@ export function GameSceneCanvas({
   canPickPlayer,
   selectedPlayerIds,
   onSelectPlayer,
+  recenterSignal = 0,
 }: GameSceneCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const recenterSignalRef = useRef<number>(recenterSignal);
+  recenterSignalRef.current = recenterSignal;
 
   // Store latest React props in refs so WebGLRenderer mounts ONCE
   const roomRef = useRef<RoomViewState>(room);
@@ -184,7 +199,27 @@ export function GameSceneCanvas({
 
     // Pointer raycasting for clicking 3D players around the table
     const dom = renderer.domElement;
+    dom.style.touchAction = 'none';
     let lastMoveRaycast = 0;
+
+    // ---- Free-look camera state (drag to look, hover parallax, recenter) ----
+    let yaw = 0;
+    let pitch = 0;
+    let yawTarget = 0;
+    let pitchTarget = 0;
+    let hoverYaw = 0;
+    let hoverPitch = 0;
+    let dragging = false;
+    let activePointerId: number | null = null;
+    let dragDistance = 0;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let lastRecenter = recenterSignalRef.current;
+
+    const recenterView = () => {
+      yawTarget = 0;
+      pitchTarget = 0;
+    };
 
     const getHitPlayerId = (clientX: number, clientY: number): string | null => {
       const rect = dom.getBoundingClientRect();
@@ -203,7 +238,63 @@ export function GameSceneCanvas({
       return null;
     };
 
+    const onPointerDown = (e: PointerEvent) => {
+      if (!e.isPrimary || e.button > 0) return;
+      dragging = true;
+      activePointerId = e.pointerId;
+      dragDistance = 0;
+      dom.style.cursor = 'grabbing';
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+      try {
+        dom.setPointerCapture(e.pointerId);
+      } catch {
+        // capture is a nicety; ignore unsupported browsers
+      }
+    };
+
     const onPointerMove = (e: PointerEvent) => {
+      const rect = dom.getBoundingClientRect();
+
+      // Gentle idle mouse-look parallax when not dragging
+      if (e.pointerType === 'mouse' && !dragging) {
+        const nx = THREE.MathUtils.clamp(
+          ((e.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1,
+          -1,
+          1,
+        );
+        const ny = THREE.MathUtils.clamp(
+          ((e.clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1,
+          -1,
+          1,
+        );
+        hoverYaw = -nx * HOVER_YAW;
+        hoverPitch = -ny * HOVER_PITCH;
+      }
+
+      if (dragging) {
+        const dx = e.clientX - lastPointerX;
+        const dy = e.clientY - lastPointerY;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+        dragDistance += Math.hypot(dx, dy);
+
+        // Sleeping players cannot peek: drags are ignored entirely
+        if (!sleepingRef.current) {
+          yawTarget = THREE.MathUtils.clamp(
+            yawTarget + dx * DRAG_YAW_SPEED,
+            -MAX_YAW,
+            MAX_YAW,
+          );
+          pitchTarget = THREE.MathUtils.clamp(
+            pitchTarget - dy * DRAG_PITCH_SPEED,
+            MIN_PITCH,
+            MAX_PITCH,
+          );
+        }
+        return;
+      }
+
       const now = performance.now();
       if (now - lastMoveRaycast < 65) return;
       lastMoveRaycast = now;
@@ -217,16 +308,65 @@ export function GameSceneCanvas({
       dom.style.cursor = hitId ? 'pointer' : 'default';
     };
 
-    const onClick = (e: MouseEvent) => {
-      if (!canPickRef.current) return;
-      const hitId = getHitPlayerId(e.clientX, e.clientY);
-      if (hitId) {
-        onSelectRef.current(hitId);
+    const onPointerUp = (e: PointerEvent) => {
+      if (!dragging || e.pointerId !== activePointerId) return;
+      dragging = false;
+      activePointerId = null;
+      dom.style.cursor = 'default';
+      try {
+        dom.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+
+      // Drag vs. click: only a near-stationary tap selects a player
+      if (dragDistance < CLICK_SLOP_PX) {
+        if (canPickRef.current && !sleepingRef.current) {
+          const hitId = getHitPlayerId(e.clientX, e.clientY);
+          if (hitId && hitId !== roomRef.current.me.playerId) {
+            onSelectRef.current(hitId);
+          }
+        }
+      }
+      dragDistance = 0;
+    };
+
+    const onPointerCancel = () => {
+      dragging = false;
+      activePointerId = null;
+      dragDistance = 0;
+    };
+
+    const onPointerLeave = () => {
+      if (!dragging) {
+        hoverYaw = 0;
+        hoverPitch = 0;
       }
     };
 
+    const onDoubleClick = (e: MouseEvent) => {
+      // Double-clicking empty scenery smoothly recenters the view
+      if (getHitPlayerId(e.clientX, e.clientY)) return;
+      recenterView();
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'r' && e.key !== 'R') return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+        return;
+      }
+      recenterView();
+    };
+
+    dom.addEventListener('pointerdown', onPointerDown);
     dom.addEventListener('pointermove', onPointerMove);
-    dom.addEventListener('click', onClick);
+    dom.addEventListener('pointerup', onPointerUp);
+    dom.addEventListener('pointercancel', onPointerCancel);
+    dom.addEventListener('pointerleave', onPointerLeave);
+    dom.addEventListener('dblclick', onDoubleClick);
+    window.addEventListener('keydown', onKeyDown);
 
     const ro = new ResizeObserver(() => {
       const w = Math.max(1, container.clientWidth);
@@ -254,7 +394,23 @@ export function GameSceneCanvas({
       const myIdx = myActor?.seatIndex ?? 0;
       const myAngle = (myIdx / seatCount) * Math.PI * 2;
 
-      // Seated perspective at the viewer's own armchair looking across the circular table at all other players
+      // Recenter requests coming from the HUD button
+      if (recenterSignalRef.current !== lastRecenter) {
+        lastRecenter = recenterSignalRef.current;
+        recenterView();
+      }
+
+      // Sleeping locks free-look and gently settles the camera back to centre
+      if (sleeping) {
+        yawTarget = 0;
+        pitchTarget = 0;
+        hoverYaw = 0;
+        hoverPitch = 0;
+      }
+      yaw = THREE.MathUtils.damp(yaw, yawTarget + hoverYaw, 9, dt);
+      pitch = THREE.MathUtils.damp(pitch, pitchTarget + hoverPitch, 9, dt);
+
+      // Seated perspective from the viewer's own armchair
       const camDist = SEAT_RADIUS + 1.55 - sleepBlend * 0.45;
       const camY = 3.55 - sleepBlend * 1.45;
       _camTargetPos.set(
@@ -263,19 +419,35 @@ export function GameSceneCanvas({
         Math.cos(myAngle) * camDist,
       );
 
-      // When sleeping, camera tilts downward toward the lap / edge of table
+      // Base direction looks across the circular table, then free-look rotates
+      // that heading around the seat (yaw) and tilts it (pitch).
+      const toCenterX = -_camTargetPos.x;
+      const toCenterY = 1.25 - _camTargetPos.y;
+      const toCenterZ = -_camTargetPos.z;
+      const flatDist = Math.max(0.0001, Math.hypot(toCenterX, toCenterZ));
+      const baseYaw = Math.atan2(toCenterX, toCenterZ);
+      const basePitch = Math.atan2(toCenterY, flatDist);
+      const lookYaw = baseYaw + yaw;
+      const userPitch = THREE.MathUtils.clamp(basePitch + pitch, MIN_PITCH, MAX_PITCH);
+      // Sleep adds a scripted downward tilt beyond the player-controlled clamp
+      const finalPitch = THREE.MathUtils.clamp(
+        userPitch - sleepBlend * 0.5,
+        -1.15,
+        MAX_PITCH,
+      );
+      const cosPitch = Math.cos(finalPitch);
       _camTargetLook.set(
-        Math.sin(myAngle) * (sleepBlend * 2.1),
-        1.25 - sleepBlend * 1.45,
-        Math.cos(myAngle) * (sleepBlend * 2.1),
+        _camTargetPos.x + Math.sin(lookYaw) * cosPitch * 4.6,
+        _camTargetPos.y + Math.sin(finalPitch) * 4.6,
+        _camTargetPos.z + Math.cos(lookYaw) * cosPitch * 4.6,
       );
 
       camera.position.x = THREE.MathUtils.damp(camera.position.x, _camTargetPos.x, 4.5, dt);
       camera.position.y = THREE.MathUtils.damp(camera.position.y, _camTargetPos.y, 4.5, dt);
       camera.position.z = THREE.MathUtils.damp(camera.position.z, _camTargetPos.z, 4.5, dt);
-      _currentLook.x = THREE.MathUtils.damp(_currentLook.x, _camTargetLook.x, 4.5, dt);
-      _currentLook.y = THREE.MathUtils.damp(_currentLook.y, _camTargetLook.y, 4.5, dt);
-      _currentLook.z = THREE.MathUtils.damp(_currentLook.z, _camTargetLook.z, 4.5, dt);
+      _currentLook.x = THREE.MathUtils.damp(_currentLook.x, _camTargetLook.x, 6, dt);
+      _currentLook.y = THREE.MathUtils.damp(_currentLook.y, _camTargetLook.y, 6, dt);
+      _currentLook.z = THREE.MathUtils.damp(_currentLook.z, _camTargetLook.z, 6, dt);
       camera.lookAt(_currentLook);
 
       // Update seated players (sleep animation, idle breathing, highlight rings)
@@ -332,8 +504,13 @@ export function GameSceneCanvas({
     return () => {
       stopLoop();
       ro.disconnect();
+      dom.removeEventListener('pointerdown', onPointerDown);
       dom.removeEventListener('pointermove', onPointerMove);
-      dom.removeEventListener('click', onClick);
+      dom.removeEventListener('pointerup', onPointerUp);
+      dom.removeEventListener('pointercancel', onPointerCancel);
+      dom.removeEventListener('pointerleave', onPointerLeave);
+      dom.removeEventListener('dblclick', onDoubleClick);
+      window.removeEventListener('keydown', onKeyDown);
       for (const actor of actorsRef.current.values()) {
         scene.remove(actor.rig.root);
         actor.rig.dispose();
@@ -359,7 +536,7 @@ export function GameSceneCanvas({
     <div
       ref={containerRef}
       data-testid="game-scene-canvas"
-      className="fixed inset-0 w-full h-full select-none"
+      className="fixed inset-0 w-full h-full select-none touch-none"
     />
   );
 }

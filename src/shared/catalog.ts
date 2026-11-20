@@ -115,6 +115,7 @@ export const HAIR_CATALOG: Record<Gender, WardrobeItemStyle[]> = {
     { id: 7, primary: '#1C1924', secondary: '#2D283A', accent: '#48405C', variant: 'undercut' },
     { id: 8, primary: '#1C1924', secondary: '#2D283A', accent: '#48405C', variant: 'afro' },
     { id: 9, primary: '#1C1924', secondary: '#2D283A', accent: '#48405C', variant: 'long_layered' },
+    { id: 10, primary: '#1C1924', secondary: '#2D283A', accent: '#48405C', variant: 'bald' },
   ],
   female: [
     { id: 0, primary: '#1C1924', secondary: '#2D283A', accent: '#48405C', variant: 'long_wavy' },
@@ -127,8 +128,15 @@ export const HAIR_CATALOG: Record<Gender, WardrobeItemStyle[]> = {
     { id: 7, primary: '#1C1924', secondary: '#2D283A', accent: '#48405C', variant: 'layered_shoulder' },
     { id: 8, primary: '#1C1924', secondary: '#2D283A', accent: '#48405C', variant: 'pixie' },
     { id: 9, primary: '#1C1924', secondary: '#2D283A', accent: '#48405C', variant: 'half_up_bow' },
+    { id: 10, primary: '#1C1924', secondary: '#2D283A', accent: '#48405C', variant: 'bald' },
   ],
 };
+
+/**
+ * Index of the "Bald" option inside every HAIR_CATALOG list. It is intentionally
+ * kept after the 10 sculpted styles so existing saved hairIds keep their meaning.
+ */
+export const BALD_HAIR_ID = 10;
 
 export interface MapThemeInfo {
   id: MapId;
@@ -191,9 +199,26 @@ export function createRandomAppearance(seedIndex?: number): CharacterAppearance 
     suitId: rand(10, 2),
     pantsId: rand(10, 3),
     hatId: wearHat ? rand(10, 8) : 'none',
-    hairId: rand(10, 5),
+    hairId: rand(11, 5),
     skinColor: SKIN_COLORS[rand(SKIN_COLORS.length, 6)],
     hairColor: HAIR_COLORS[rand(HAIR_COLORS.length, 7)],
+  };
+}
+
+/**
+ * Shuffles outfit, hat, hair style and colours for a fixed gender (used by the
+ * lobby "Randomize" button) while keeping the player's chosen gender intact.
+ */
+export function getRandomAppearanceForGender(gender: Gender): CharacterAppearance {
+  const pick = <T,>(list: T[]): T => list[Math.floor(Math.random() * list.length)];
+  return {
+    gender,
+    suitId: Math.floor(Math.random() * SUIT_CATALOG[gender].length),
+    pantsId: Math.floor(Math.random() * PANTS_CATALOG[gender].length),
+    hatId: Math.random() < 0.4 ? 'none' : Math.floor(Math.random() * HAT_CATALOG.length),
+    hairId: Math.floor(Math.random() * HAIR_CATALOG[gender].length),
+    skinColor: pick(SKIN_COLORS),
+    hairColor: pick(HAIR_COLORS),
   };
 }
 
