@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display-en: 'Fredoka', 'Poppins', system-ui, sans-serif;
+    --font-body-en: 'Poppins', system-ui, sans-serif;
+    --font-ar: 'Cairo', 'Tajawal', system-ui, sans-serif;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: #110c26;
+    color: #f8f7ff;
+  }
+
+  html[lang='en'] body {
+    font-family: var(--font-body-en);
+  }
+
+  html[lang='en'] .font-display {
+    font-family: var(--font-display-en);
+  }
+
+  html[lang='ar'] body,
+  html[lang='ar'] .font-display {
+    font-family: var(--font-ar);
+  }
+}
+
+/* Custom sleek scrollbars for wardrobe grids */
+.mafia-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.mafia-scroll::-webkit-scrollbar-track {
+  background: rgba(17, 12, 38, 0.45);
+  border-radius: 999px;
+}
+
+.mafia-scroll::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.4);
+  border-radius: 999px;
+}
+
+.mafia-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(250, 204, 21, 0.7);
+}
+
+@keyframes shake-input {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake-input 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes float-z {
+  0% {
+    transform: translateY(8px) scale(0.8);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(-28px) scale(1.15);
+    opacity: 0;
+  }
+}
+
+.animate-float-z {
+  animation: float-z 2.6s ease-out infinite;
+}
+
+@keyframes card-reveal-pop {
+  0% {
+    transform: scale(0.75) translateY(20px);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(1.04) translateY(-4px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-card-pop {
+  animation: card-reveal-pop 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shake,
+  .animate-float-z,
+  .animate-card-pop {
+    animation: none;
+  }
+}
