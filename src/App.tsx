@@ -23,6 +23,12 @@ export default function App() {
   const [muted, setMuted] = useState<boolean>(() => audioSynth.isMuted());
   const [rulesOpen, setRulesOpen] = useState<boolean>(false);
   const [room, setRoom] = useState<RoomViewState | null>(null);
+  // Invite links look like https://host/?room=K7M4P
+  const [initialRoomCode] = useState<string | null>(() =>
+    typeof window === 'undefined'
+      ? null
+      : new URLSearchParams(window.location.search).get('room'),
+  );
 
   const adapterRef = useRef<NetworkAdapter | null>(null);
   const prevPhaseRef = useRef<GamePhase | null>(null);
@@ -238,6 +244,7 @@ export default function App() {
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           onQuickSoloDemo={handleQuickSoloDemo}
+          initialRoomCode={initialRoomCode}
         />
       ) : room.phase === 'LOBBY' ? (
         <LobbyScreen

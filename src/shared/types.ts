@@ -173,6 +173,8 @@ export interface ValidationErrorPayload {
     | 'NAME_TOO_LONG'
     | 'NAME_INVALID'
     | 'ROOM_NOT_FOUND'
+    | 'INVALID_ROOM_CODE'
+    | 'SERVER_UNREACHABLE'
     | 'ROOM_FULL'
     | 'GAME_ALREADY_STARTED'
     | 'MIN_PLAYERS_REQUIRED'

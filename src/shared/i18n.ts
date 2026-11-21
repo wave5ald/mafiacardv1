@@ -211,7 +211,10 @@ export const DICTIONARY: Record<Language, TranslationDictionary> = {
       NAME_TOO_SHORT: 'Name must be at least 2 characters.',
       NAME_TOO_LONG: 'Name must be 16 characters or fewer.',
       NAME_INVALID: 'Use English/Arabic letters, numbers, or spaces only.',
-      ROOM_NOT_FOUND: 'Room not found. Check the code and try again.',
+      ROOM_NOT_FOUND:
+        'No lobby is online with that code. Ask the host to keep the lobby open, then try again.',
+      INVALID_ROOM_CODE: 'Room codes are 5 characters (no I, O, 0 or 1).',
+      SERVER_UNREACHABLE: 'Could not connect. Check your internet connection and try again.',
       ROOM_FULL: 'This table is full (10/10 players).',
       GAME_ALREADY_STARTED: 'Match already in progress.',
       MIN_PLAYERS_REQUIRED: 'Need at least {min} players to start.',
@@ -615,7 +618,10 @@ export const DICTIONARY: Record<Language, TranslationDictionary> = {
       NAME_TOO_SHORT: 'يجب أن يتكون الاسم من حرفين على الأقل.',
       NAME_TOO_LONG: 'يجب ألا يتجاوز الاسم 16 حرفاً.',
       NAME_INVALID: 'استخدم الحروف العربية أو الإنجليزية والأرقام فقط.',
-      ROOM_NOT_FOUND: 'لم يتم العثور على الغرفة. تحقق من الرمز وحاول مجدداً.',
+      ROOM_NOT_FOUND:
+        'لا توجد غرفة بهذا الرمز الآن. تأكد أن المضيف ما زال في الغرفة ثم حاول مجدداً.',
+      INVALID_ROOM_CODE: 'رمز الغرفة مكوّن من ٥ أحرف أو أرقام (بدون I أو O أو 0 أو 1).',
+      SERVER_UNREACHABLE: 'تعذّر الاتصال. تحقق من الإنترنت وحاول مجدداً.',
       ROOM_FULL: 'الطاولة ممتلئة بالكامل (10/10 لاعبين).',
       GAME_ALREADY_STARTED: 'المباراة قيد التشغيل بالفعل.',
       MIN_PLAYERS_REQUIRED: 'يلزم وجود {min} لاعبين على الأقل لبدء اللعبة.',

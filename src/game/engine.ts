@@ -20,6 +20,7 @@ import {
   Role,
   RoomViewState,
 } from '../shared/types';
+import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../shared/roomCode';
 import {
   assignRolesAndCards,
   checkWinner,
@@ -106,15 +107,6 @@ export const DEFAULT_SETTINGS: GameSettings = {
   skipVoteEnabled: true,
 };
 
-function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 5; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
-
 function makeEventId(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -155,7 +147,8 @@ export class GameRoomEngine {
 
     this.leaveRoom(playerId);
 
-    let roomCode = preferredCode?.trim().toUpperCase() || generateRoomCode();
+    const requestedCode = preferredCode ? normalizeRoomCode(preferredCode) : '';
+    let roomCode = isValidRoomCode(requestedCode) ? requestedCode : generateRoomCode();
     while (this.rooms.has(roomCode)) {
       roomCode = generateRoomCode();
     }
@@ -236,7 +229,10 @@ export class GameRoomEngine {
       return { ok: false, error: check.error };
     }
 
-    const code = (rawRoomCode || '').trim().toUpperCase();
+    const code = normalizeRoomCode(rawRoomCode);
+    if (!isValidRoomCode(code)) {
+      return { ok: false, error: 'INVALID_ROOM_CODE' };
+    }
     const room = this.rooms.get(code);
     if (!room) {
       return { ok: false, error: 'ROOM_NOT_FOUND' };

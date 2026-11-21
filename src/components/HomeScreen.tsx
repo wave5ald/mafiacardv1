@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
   Globe,
@@ -11,6 +11,11 @@ import {
 } from 'lucide-react';
 import { audioSynth } from '../audio/synth';
 import { validatePlayerName } from '../game/rules';
+import {
+  extractRoomCodeFromInput,
+  isValidRoomCode,
+  ROOM_CODE_LENGTH,
+} from '../shared/roomCode';
 import { DICTIONARY } from '../shared/i18n';
 import { Language, ValidationErrorPayload } from '../shared/types';
 import { HeroMascotCanvas } from '../three/HeroMascotCanvas';
@@ -28,6 +33,8 @@ interface HomeScreenProps {
   onCreateRoom: (name: string) => Promise<ValidationErrorPayload['code'] | null>;
   onJoinRoom: (roomCode: string, name: string) => Promise<ValidationErrorPayload['code'] | null>;
   onQuickSoloDemo: (name: string) => Promise<void>;
+  /** Room code taken from a shared invite link (?room=CODE). */
+  initialRoomCode?: string | null;
 }
 
 export function HomeScreen({
@@ -41,6 +48,7 @@ export function HomeScreen({
   onCreateRoom,
   onJoinRoom,
   onQuickSoloDemo,
+  initialRoomCode,
 }: HomeScreenProps) {
   const t = DICTIONARY[lang];
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +61,13 @@ export function HomeScreen({
   const [busy, setBusy] = useState(false);
 
   const nameValidation = validatePlayerName(playerName);
+
+  // Prefill the join dialog from an invite link instead of making the guest retype it.
+  useEffect(() => {
+    if (!initialRoomCode) return;
+    const { code } = extractRoomCodeFromInput(initialRoomCode);
+    if (code) setRoomCodeInput(code);
+  }, [initialRoomCode]);
 
   const triggerNameGateError = (code: ValidationErrorPayload['code']) => {
     setNameError(code);
@@ -98,8 +113,8 @@ export function HomeScreen({
       return;
     }
     const cleanCode = roomCodeInput.trim().toUpperCase();
-    if (cleanCode.length < 3) {
-      setJoinError('ROOM_NOT_FOUND');
+    if (!isValidRoomCode(cleanCode)) {
+      setJoinError('INVALID_ROOM_CODE');
       audioSynth.error();
       return;
     }
@@ -351,10 +366,31 @@ export function HomeScreen({
               type="text"
               dir="ltr"
               autoFocus
-              maxLength={8}
+              maxLength={ROOM_CODE_LENGTH}
+              inputMode="text"
+              autoComplete="off"
+              spellCheck={false}
               value={roomCodeInput}
+              onPaste={(event) => {
+                const pasted = event.clipboardData.getData('text');
+                if (!pasted.includes('://') && !pasted.includes('room=')) return;
+                // Stop the browser from dumping a whole invitation URL into a 5-character field.
+                event.preventDefault();
+                const { code } = extractRoomCodeFromInput(pasted);
+                setRoomCodeInput(code);
+                setJoinError(code ? null : 'INVALID_ROOM_CODE');
+              }}
               onChange={(e) => {
-                setRoomCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+                const typed = e.target.value;
+                if (typed.includes('://') || typed.includes('room=')) {
+                  const { code } = extractRoomCodeFromInput(typed);
+                  setRoomCodeInput(code);
+                  setJoinError(code ? null : 'INVALID_ROOM_CODE');
+                  return;
+                }
+                setRoomCodeInput(
+                  typed.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, ROOM_CODE_LENGTH),
+                );
                 if (joinError) setJoinError(null);
               }}
               placeholder={t.roomCodePlaceholder}

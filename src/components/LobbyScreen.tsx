@@ -116,8 +116,10 @@ export function LobbyScreen({
 
   const handleCopyCode = async () => {
     audioSynth.click();
+    // Share a link that fills in the code for the guest, not a bare string they must type.
+    const inviteLink = `${window.location.origin}${window.location.pathname}?room=${room.roomCode}`;
     try {
-      await navigator.clipboard?.writeText(room.roomCode);
+      await navigator.clipboard?.writeText(inviteLink);
     } catch {
       // fallback ignore
     }
