@@ -7,11 +7,14 @@ import {
   RoomViewState,
 } from '../shared/types';
 import { PeerRoomAdapter } from './peerAdapter';
+import { RelayRoomAdapter } from './relayAdapter';
 
 export type RoomStateListener = (state: RoomViewState | null) => void;
 
+export type TransportMode = 'socket' | 'relay' | 'peer';
+
 export interface NetworkAdapter {
-  readonly mode: 'socket' | 'peer';
+  readonly mode: TransportMode;
   subscribe(listener: RoomStateListener): () => void;
   createRoom(
     playerName: string,
@@ -47,19 +50,28 @@ function resolveServerUrl(): string {
 }
 
 /**
- * Uses the Socket.IO room server when one is reachable (local `npm run dev`, or
- * a dedicated Node host configured through VITE_SERVER_URL) and otherwise falls
- * back to the peer-to-peer transport, which is what makes rooms work on static
- * hosting such as Vercel where no room server exists at all.
+ * Picks the best room transport available at runtime:
+ *
+ * 1. `socket` — a real Socket.IO room server (local `npm run dev`, or a Node
+ *    host configured through VITE_SERVER_URL).
+ * 2. `relay` — messages relayed through public MQTT-over-WebSocket brokers, so
+ *    rooms work on static hosting (Vercel) regardless of NAT.
+ * 3. `peer` — direct WebRTC as a last resort when every relay broker is
+ *    unreachable.
  */
 export class HybridNetworkAdapter implements NetworkAdapter {
   private socket: Socket | null = null;
   private socketConnected = false;
+  private relay = new RelayRoomAdapter();
   private peer = new PeerRoomAdapter();
   private listeners = new Set<RoomStateListener>();
-  private activeLayer: 'socket' | 'peer' = 'peer';
+  private activeLayer: TransportMode = 'relay';
 
   constructor() {
+    this.relay.subscribe((view) => {
+      if (this.activeLayer === 'relay') this.emitState(view);
+    });
+
     this.peer.subscribe((view) => {
       if (this.activeLayer === 'peer') this.emitState(view);
     });
@@ -72,7 +84,7 @@ export class HybridNetworkAdapter implements NetworkAdapter {
     try {
       this.socket = io(serverUrl, {
         transports: ['websocket', 'polling'],
-        reconnectionAttempts: 3,
+        reconnectionAttempts: 2,
         reconnectionDelayMax: 4000,
         timeout: 2500,
       });
@@ -93,7 +105,7 @@ export class HybridNetworkAdapter implements NetworkAdapter {
     }
   }
 
-  public get mode(): 'socket' | 'peer' {
+  public get mode(): TransportMode {
     return this.activeLayer;
   }
 
@@ -139,7 +151,14 @@ export class HybridNetworkAdapter implements NetworkAdapter {
         this.activeLayer = 'socket';
         return res;
       }
+      if (res.error && res.error !== 'SERVER_UNREACHABLE') return res;
     }
+
+    this.activeLayer = 'relay';
+    const relayed = await this.relay.createRoom(playerName, appearance);
+    if (relayed.ok) return relayed;
+    if (relayed.error && relayed.error !== 'SERVER_UNREACHABLE') return relayed;
+
     this.activeLayer = 'peer';
     return this.peer.createRoom(playerName, appearance);
   }
@@ -160,12 +179,21 @@ export class HybridNetworkAdapter implements NetworkAdapter {
         return res;
       }
       // The server answered and rejected the code (or the server no longer has
-      // that room). Do not silently retry over peer-to-peer, that would mask a
-      // real answer with a confusing one.
+      // that room). Do not silently retry elsewhere, that would mask a real
+      // answer with a confusing one.
       if (res.error && res.error !== 'SERVER_UNREACHABLE') return res;
     }
+
+    // A room could be hosted over either fallback, so try both before failing.
+    this.activeLayer = 'relay';
+    const relayed = await this.relay.joinRoom(roomCode, playerName, appearance);
+    if (relayed.ok) return relayed;
+
     this.activeLayer = 'peer';
-    return this.peer.joinRoom(roomCode, playerName, appearance);
+    const peered = await this.peer.joinRoom(roomCode, playerName, appearance);
+    if (peered.ok) return peered;
+
+    return relayed.error === 'ROOM_NOT_FOUND' ? relayed : peered.error ? peered : relayed;
   }
 
   public leaveRoom(): void {
@@ -173,85 +201,92 @@ export class HybridNetworkAdapter implements NetworkAdapter {
       this.socket.emit('leave_room');
       this.emitState(null);
     }
+    this.relay.leaveRoom();
     this.peer.leaveRoom();
   }
 
   public addBot(lang: Language): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('add_bot', { lang })
-      : this.peer.addBot(lang);
+    if (this.activeLayer === 'socket') return this.emitSocket('add_bot', { lang });
+    return this.activeLayer === 'peer' ? this.peer.addBot(lang) : this.relay.addBot(lang);
   }
 
   public removeBot(botId?: string): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('remove_bot', { botId })
-      : this.peer.removeBot(botId);
+    if (this.activeLayer === 'socket') return this.emitSocket('remove_bot', { botId });
+    return this.activeLayer === 'peer' ? this.peer.removeBot(botId) : this.relay.removeBot(botId);
   }
 
   public updateAppearance(appearance: CharacterAppearance): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('update_appearance', { appearance })
-      : this.peer.updateAppearance(appearance);
+    if (this.activeLayer === 'socket') return this.emitSocket('update_appearance', { appearance });
+    return this.activeLayer === 'peer'
+      ? this.peer.updateAppearance(appearance)
+      : this.relay.updateAppearance(appearance);
   }
 
   public setReady(isReady: boolean): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('set_ready', { isReady })
-      : this.peer.setReady(isReady);
+    if (this.activeLayer === 'socket') return this.emitSocket('set_ready', { isReady });
+    return this.activeLayer === 'peer' ? this.peer.setReady(isReady) : this.relay.setReady(isReady);
   }
 
   public updateSettings(patch: Partial<GameSettings>): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('update_settings', { patch })
-      : this.peer.updateSettings(patch);
+    if (this.activeLayer === 'socket') return this.emitSocket('update_settings', { patch });
+    return this.activeLayer === 'peer'
+      ? this.peer.updateSettings(patch)
+      : this.relay.updateSettings(patch);
   }
 
   public startGame(): Promise<ActionResponse> {
-    return this.activeLayer === 'socket' ? this.emitSocket('start_game', {}) : this.peer.startGame();
+    if (this.activeLayer === 'socket') return this.emitSocket('start_game', {});
+    return this.activeLayer === 'peer' ? this.peer.startGame() : this.relay.startGame();
   }
 
   public submitNightTarget(targetId: string): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('submit_night_target', { targetId })
-      : this.peer.submitNightTarget(targetId);
+    if (this.activeLayer === 'socket') return this.emitSocket('submit_night_target', { targetId });
+    return this.activeLayer === 'peer'
+      ? this.peer.submitNightTarget(targetId)
+      : this.relay.submitNightTarget(targetId);
   }
 
   public confirmNightAction(): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('confirm_night_action', {})
-      : this.peer.confirmNightAction();
+    if (this.activeLayer === 'socket') return this.emitSocket('confirm_night_action', {});
+    return this.activeLayer === 'peer'
+      ? this.peer.confirmNightAction()
+      : this.relay.confirmNightAction();
   }
 
   public continuePhase(): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('continue_phase', {})
-      : this.peer.continuePhase();
+    if (this.activeLayer === 'socket') return this.emitSocket('continue_phase', {});
+    return this.activeLayer === 'peer' ? this.peer.continuePhase() : this.relay.continuePhase();
   }
 
   public submitDayVote(targetId: string | 'SKIP'): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('submit_day_vote', { targetId })
-      : this.peer.submitDayVote(targetId);
+    if (this.activeLayer === 'socket') return this.emitSocket('submit_day_vote', { targetId });
+    return this.activeLayer === 'peer'
+      ? this.peer.submitDayVote(targetId)
+      : this.relay.submitDayVote(targetId);
   }
 
   public activateAbility(targetId?: string, secondTargetId?: string): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('activate_ability', { targetId, secondTargetId })
-      : this.peer.activateAbility(targetId, secondTargetId);
+    if (this.activeLayer === 'socket') {
+      return this.emitSocket('activate_ability', { targetId, secondTargetId });
+    }
+    return this.activeLayer === 'peer'
+      ? this.peer.activateAbility(targetId, secondTargetId)
+      : this.relay.activateAbility(targetId, secondTargetId);
   }
 
   public playAgain(): Promise<ActionResponse> {
-    return this.activeLayer === 'socket' ? this.emitSocket('play_again', {}) : this.peer.playAgain();
+    if (this.activeLayer === 'socket') return this.emitSocket('play_again', {});
+    return this.activeLayer === 'peer' ? this.peer.playAgain() : this.relay.playAgain();
   }
 
   public returnToLobby(): Promise<ActionResponse> {
-    return this.activeLayer === 'socket'
-      ? this.emitSocket('return_to_lobby', {})
-      : this.peer.returnToLobby();
+    if (this.activeLayer === 'socket') return this.emitSocket('return_to_lobby', {});
+    return this.activeLayer === 'peer' ? this.peer.returnToLobby() : this.relay.returnToLobby();
   }
 
   public dispose(): void {
     this.socket?.disconnect();
+    this.relay.dispose();
     this.peer.dispose();
     this.listeners.clear();
   }
